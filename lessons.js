@@ -86,4 +86,13 @@ const LESSONS = [
     { id: 'week', en: 'week', bs: 'Sedmica', ar: 'أسبوع', tr: 'osbuʿ' },
     { id: 'later', en: 'later', bs: 'Kasnije', ar: 'بعدين', tr: 'baʿdein' },
   ]},
+  { id: 'weekdays', level: 3, emoji: '📅', title: 'Days of the week', items: [
+    { id: 'mon', en: 'Monday', bs: 'Ponedjeljak', ar: 'الاتنين', tr: 'el-etnein' },
+    { id: 'tue', en: 'Tuesday', bs: 'Utorak', ar: 'التلات', tr: 'et-talat' },
+    { id: 'wed', en: 'Wednesday', bs: 'Srijeda', ar: 'الأربع', tr: 'el-arbaʿ' },
+    { id: 'thu', en: 'Thursday', bs: 'Četvrtak', ar: 'الخميس', tr: 'el-khamis' },
+    { id: 'fri', en: 'Friday', bs: 'Petak', ar: 'الجمعة', tr: 'eg-gomʿa' },
+    { id: 'sat', en: 'Saturday', bs: 'Subota', ar: 'السبت', tr: 'es-sabt' },
+    { id: 'sun', en: 'Sunday', bs: 'Nedjelja', ar: 'الحد', tr: 'el-hadd' },
+  ]},
 ];
