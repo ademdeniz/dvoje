@@ -1,0 +1,9 @@
+{
+  "name": "Dvoje · اتنين",
+  "short_name": "Dvoje",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FFF8F0",
+  "theme_color": "#0F766E",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
