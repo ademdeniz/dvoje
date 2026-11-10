@@ -79,3 +79,6 @@ main > * { flex-shrink:0; } header, nav { flex-shrink:0; } main { min-height:0; 
 
 .voiced { color:var(--teal) !important; font-weight:600; }
 .rec-chips { display:flex; flex-wrap:wrap; gap:6px; } .rec-chip { border:1px solid var(--line); border-radius:99px; padding:4px 12px; background:#F0FBF9; font-size:15px; }
+
+.rec-list { display:flex; flex-direction:column; gap:6px; } .rec-row { display:flex; align-items:center; gap:10px; width:100%; text-align:start; border:1px solid var(--line); border-radius:14px; padding:8px 12px; background:#F0FBF9; }
+.rec-row small { display:block; color:var(--muted); font-size:14px; margin-top:2px; } .rec-play { font-size:22px; } .tr-inline { color:var(--teal); }

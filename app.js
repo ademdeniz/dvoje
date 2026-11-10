@@ -460,7 +460,11 @@ function viewFeed() {
       h('div', { class: 'post-head' }, avatar(e.author), h('b', {}, nameOf(e.author)), h('span', { class: 'muted small' }, ago(e.at))),
       e.type === 'rec'
         ? [h('p', {}, `recorded ${p.items.length} ${l.emoji} ${l.title} word${p.items.length === 1 ? '' : 's'} for you 🎙️`),
-          h('div', { class: 'rec-chips' }, p.items.filter(id => ITEMS[id]).map(id => h('button', { class: 'rec-chip', onclick: () => speak(ITEMS[id], e.author) }, '▶️ ', W(ITEMS[id], e.author))))]
+          h('div', { class: 'rec-list' }, p.items.filter(id => ITEMS[id]).map(id => { const it = ITEMS[id], mine = other(e.author);
+            // The recorded word, then how it sounds (Arabic only), the word in the other language and the English.
+            return h('button', { class: 'rec-row', onclick: () => speak(it, e.author) }, h('span', { class: 'rec-play' }, '▶️'),
+              h('span', { class: 'grow' }, W(it, e.author, 'big'),
+                h('small', {}, e.author === 'ar' && translit(it) ? h('i', { class: 'tr-inline' }, translit(it) + ' · ') : null, W(it, mine), ' · ' + it.en))); }))]
         : e.type === 'note'
         ? [l ? h('div', { class: 'muted small' }, `after ${l.emoji} ${l.title}`) : null, h('p', { class: 'note', dir: 'auto' }, p.text)]
         : [h('p', {}, `finished ${l ? l.emoji + ' ' + l.title : 'a lesson'} — ${p.score}/${p.total} · +${p.xp} XP`),
