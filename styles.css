@@ -76,3 +76,6 @@ nav button span { font-size:20px; filter:grayscale(1); opacity:.6; } nav button.
 .code { font-family:ui-monospace,Menlo,monospace; font-size:20px; letter-spacing:.06em; color:var(--teal); user-select:all; -webkit-user-select:all; } li .code { font-size:inherit; }
 /* Cards in the scrolling area keep their full height; the area scrolls instead of squashing them. */
 main > * { flex-shrink:0; } header, nav { flex-shrink:0; } main { min-height:0; }
+
+.voiced { color:var(--teal) !important; font-weight:600; }
+.rec-chips { display:flex; flex-wrap:wrap; gap:6px; } .rec-chip { border:1px solid var(--line); border-radius:99px; padding:4px 12px; background:#F0FBF9; font-size:15px; }

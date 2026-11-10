@@ -28,10 +28,11 @@ const Store = (() => {
     try { const v = await idb('readonly', s => s.get(room)); if (v) { events = v.events || []; cursor = v.cursor || 0; } } catch {}
   }
   async function rpc(fn, body) {
-    const r = await fetch(`${CFG.url.replace(/\/$/, '')}/rest/v1/rpc/${fn}`, {
+    let r;
+    try { r = await fetch(`${CFG.url.replace(/\/$/, '')}/rest/v1/rpc/${fn}`, {
       method: 'POST', headers: { apikey: CFG.key, Authorization: 'Bearer ' + CFG.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    });
-    if (!r.ok) throw new Error(fn + ' ' + r.status);
+    }); } catch (err) { err.network = true; throw err; }
+    if (!r.ok) { const err = new Error(fn + ' ' + r.status); err.status = r.status; throw err; }
     return r.status === 204 ? null : r.json();
   }
   async function sync() {
@@ -39,7 +40,13 @@ const Store = (() => {
     syncing = true; let changed = false; const forRoom = room;
     try {
       for (const e of events.filter(e => !e.synced)) {
-        await rpc('add_event', { p_room: forRoom, p_id: e.id, p_author: e.author, p_type: e.type, p_payload: e.payload, p_at: e.at });
+        try { await rpc('add_event', { p_room: forRoom, p_id: e.id, p_author: e.author, p_type: e.type, p_payload: e.payload, p_at: e.at }); }
+        catch (err) {
+          // The server refused this one event (e.g. a recording that is too big). Keep it on this
+          // phone but stop retrying, so it never holds up the messages and lessons behind it.
+          if (err.network || !(err.status >= 400 && err.status < 500)) throw err;
+          e.rejected = true; console.warn('Not synced:', e.type, err.message);
+        }
         e.synced = true; changed = true;
       }
       for (;;) {
@@ -101,7 +108,8 @@ const LANG = {
 };
 const other = r => (r === 'bs' ? 'ar' : 'bs');
 const ITEMS = {};
-LESSONS.forEach(l => l.items.forEach(it => { ITEMS[it.id] = it; }));
+const LESSON_OF = {};
+LESSONS.forEach(l => l.items.forEach(it => { ITEMS[it.id] = it; LESSON_OF[it.id] = l; }));
 const REACTIONS = ['❤️', '😂', '👏', '🔥'];
 
 let me = localStorage.getItem('dvoje.me');      // 'bs' or 'ar' = my native language
@@ -131,12 +139,20 @@ const ago = t => { const s = (Date.now() - t) / 1000; if (s < 60) return 'just n
 
 // ---------- Derive everything from the event log ----------
 function derive() {
+  const recLast = {};
   const d = { names: {}, fixes: {}, audio: {}, done: { bs: {}, ar: {} }, xp: { bs: 0, ar: 0 }, days: { bs: new Set(), ar: new Set() }, reacts: {}, feed: [] };
   for (const e of Store.all()) {
     const p = e.payload || {};
     if (e.type === 'profile') d.names[e.author] = p.name;
     else if (e.type === 'fix') d.fixes[p.item + ':' + e.author] = p;
-    else if (e.type === 'audio') d.audio[p.item + ':' + e.author] = p.data;
+    else if (e.type === 'audio') {
+      d.audio[p.item + ':' + e.author] = p.data;
+      // Group a burst of recordings for one lesson into a single post in the Us feed.
+      const l = LESSON_OF[p.item]; if (!l) continue;
+      const last = recLast[e.author];
+      if (last && last.payload.lesson === l.id && e.at - last.at < 3 * 3600000) { if (!last.payload.items.includes(p.item)) last.payload.items.push(p.item); last.at = e.at; }
+      else { recLast[e.author] = { id: e.id, type: 'rec', author: e.author, at: e.at, payload: { lesson: l.id, items: [p.item] } }; d.feed.push(recLast[e.author]); }
+    }
     else if (e.type === 'done') {
       const prev = d.done[e.author][p.lesson];
       if (!prev || p.score / p.total >= prev.score / prev.total) d.done[e.author][p.lesson] = p;
@@ -144,6 +160,7 @@ function derive() {
     } else if (e.type === 'note') d.feed.push(e);
     else if (e.type === 'react') { const r = (d.reacts[p.target] ||= {}); (r[p.emoji] ||= new Set()).add(e.author); }
   }
+  d.feed.sort((a, b) => a.at - b.at);
   d.streak = r => streak(t => d.days[r].has(t));
   d.together = streak(t => d.days.bs.has(t) && d.days.ar.has(t));
   return d;
@@ -162,7 +179,10 @@ function W(item, lang, cls) { return h('span', { class: 'w ' + lang + ' ' + (cls
 // ---------- Sound: partner's recording first, phone voice as a fallback ----------
 function speak(item, lang) {
   const rec = D.audio[item.id + ':' + lang];
-  if (rec) { new Audio(rec).play().catch(() => {}); return; }
+  if (rec) { new Audio(rec).play().catch(() => robot(item, lang)); return; }
+  robot(item, lang);
+}
+function robot(item, lang) {
   if (!('speechSynthesis' in window)) return;
   const voice = speechSynthesis.getVoices().find(v => LANG[lang].tts.some(p => v.lang.toLowerCase().startsWith(p)));
   const u = new SpeechSynthesisUtterance(word(item, lang));
@@ -179,7 +199,8 @@ async function toggleRecord(item) {
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
   catch { alert('The microphone was not allowed.'); return; }
-  const rec = new MediaRecorder(stream); const chunks = [];
+  const type = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/aac', 'audio/webm;codecs=opus', 'audio/webm'].find(t => window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+  const rec = type ? new MediaRecorder(stream, { mimeType: type }) : new MediaRecorder(stream); const chunks = [];
   rec.ondataavailable = e => chunks.push(e.data);
   rec.onstop = () => {
     stream.getTracks().forEach(t => t.stop()); clearTimeout(ui.recording.timer); ui.recording = null;
@@ -393,6 +414,7 @@ function viewOnboard() {
 }
 const avatar = r => h('div', { class: 'avatar ' + r }, (nameOf(r)[0] || '?').toUpperCase());
 
+const voiced = l => l.items.filter(it => D.audio[it.id + ':' + other(me)]).length;
 function viewHome() {
   const them = other(me);
   const nextLesson = LESSONS.find(l => !D.done[me][l.id]);
@@ -420,7 +442,8 @@ function viewHome() {
     const open = i === 0 || D.done[me][LESSONS[i - 1].id];
     out.push(h('button', { class: 'lesson' + (open ? '' : ' locked') + (mine ? ' finished' : ''), disabled: !open, onclick: () => startLesson(l) },
       h('span', { class: 'emoji' }, open ? l.emoji : '🔒'),
-      h('span', { class: 'grow' }, h('b', {}, l.title), h('small', {}, mine ? `Your best: ${mine.score}/${mine.total}` : open ? `${l.items.length} words` : 'Finish the lesson before this one')),
+      h('span', { class: 'grow' }, h('b', {}, l.title), h('small', {}, mine ? `Your best: ${mine.score}/${mine.total}` : open ? `${l.items.length} words` : 'Finish the lesson before this one'),
+        voiced(l) ? h('small', { class: 'voiced' }, `🗣️ ${voiced(l)}/${l.items.length} in ${nameOf(them)}'s voice`) : null),
       theirs ? h('span', { class: 'badge', title: nameOf(them) + ' finished this' }, avatar(them), '✓') : null,
       mine ? h('span', { class: 'tick' }, '✓') : null));
   });
@@ -435,7 +458,10 @@ function viewFeed() {
     const p = e.payload, r = D.reacts[e.id] || {}, l = p.lesson && lessonOf(p.lesson), target = other(e.author);
     return h('div', { class: 'card post ' + (e.author === me ? 'mine' : '') },
       h('div', { class: 'post-head' }, avatar(e.author), h('b', {}, nameOf(e.author)), h('span', { class: 'muted small' }, ago(e.at))),
-      e.type === 'note'
+      e.type === 'rec'
+        ? [h('p', {}, `recorded ${p.items.length} ${l.emoji} ${l.title} word${p.items.length === 1 ? '' : 's'} for you 🎙️`),
+          h('div', { class: 'rec-chips' }, p.items.filter(id => ITEMS[id]).map(id => h('button', { class: 'rec-chip', onclick: () => speak(ITEMS[id], e.author) }, '▶️ ', W(ITEMS[id], e.author))))]
+        : e.type === 'note'
         ? [l ? h('div', { class: 'muted small' }, `after ${l.emoji} ${l.title}`) : null, h('p', { class: 'note', dir: 'auto' }, p.text)]
         : [h('p', {}, `finished ${l ? l.emoji + ' ' + l.title : 'a lesson'} — ${p.score}/${p.total} · +${p.xp} XP`),
           (p.bloopers || []).filter(b => ITEMS[b.item] && ITEMS[b.picked]).map(b => h('div', { class: 'blooper' }, 'mixed up ', W(ITEMS[b.item], target), ` (${ITEMS[b.item].en}) with `, W(ITEMS[b.picked], target), ` (${ITEMS[b.picked].en}) 😅`))],
@@ -472,7 +498,9 @@ function viewTeach() {
   };
   return [
     h('div', { class: 'card' }, h('h2', {}, `You're ${nameOf(them)}'s teacher`),
-      h('p', { class: 'muted' }, `These are the ${LANG[me].name} words ${nameOf(them)} is learning. Record them in your voice 🎙️ and fix anything you'd say differently ✏️.`)),
+      h('p', { class: 'muted' }, `These are the ${LANG[me].name} words ${nameOf(them)} is learning. Record them in your voice 🎙️ and fix anything you'd say differently ✏️. ${nameOf(them)} hears your voice in their lessons.`),
+      (() => { const n = Object.keys(D.audio).filter(k => k.endsWith(':' + them)).length;
+        return h('p', { class: 'small voiced' }, n ? `🗣️ ${nameOf(them)} has recorded ${n} ${LANG[them].name} word${n === 1 ? '' : 's'} for you. Find them in the Us tab, or tap 🗣️ during your lessons.` : `${nameOf(them)} hasn't recorded any ${LANG[them].name} words for you yet.`); })()),
     LESSONS.map(l => {
       const recorded = l.items.filter(it => D.audio[it.id + ':' + me]).length, open = ui.teachOpen === l.id;
       return h('div', { class: 'card teach' },
