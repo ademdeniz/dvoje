@@ -74,3 +74,5 @@ nav button span { font-size:20px; filter:grayscale(1); opacity:.6; } nav button.
 .hint { display:flex; flex-direction:column; gap:10px; border-color:#F6C9A8; background:#FFF8F0; } .hint h3 { margin:0; } .hint p { margin:0; } .hint ol { margin:0; padding-inline-start:20px; line-height:1.6; }
 .code-box { background:#F0FBF9; border:2px dashed #9FD5CC; border-radius:14px; padding:10px; text-align:center; margin:8px 0; }
 .code { font-family:ui-monospace,Menlo,monospace; font-size:20px; letter-spacing:.06em; color:var(--teal); user-select:all; -webkit-user-select:all; } li .code { font-size:inherit; }
+/* Cards in the scrolling area keep their full height; the area scrolls instead of squashing them. */
+main > * { flex-shrink:0; } header, nav { flex-shrink:0; } main { min-height:0; }
