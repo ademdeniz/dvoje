@@ -70,3 +70,7 @@ nav button span { font-size:20px; filter:grayscale(1); opacity:.6; } nav button.
 @keyframes pulse { 50% { transform:scale(1.12); } }
 .stats { display:flex; justify-content:space-around; margin-top:12px; color:var(--muted); font-size:13px; } .stats b { display:block; font-size:20px; color:var(--ink); }
 .card.center .avatar { margin:0 auto 8px; width:64px; height:64px; font-size:26px; }
+
+.hint { display:flex; flex-direction:column; gap:10px; border-color:#F6C9A8; background:#FFF8F0; } .hint h3 { margin:0; } .hint p { margin:0; } .hint ol { margin:0; padding-inline-start:20px; line-height:1.6; }
+.code-box { background:#F0FBF9; border:2px dashed #9FD5CC; border-radius:14px; padding:10px; text-align:center; margin:8px 0; }
+.code { font-family:ui-monospace,Menlo,monospace; font-size:20px; letter-spacing:.06em; color:var(--teal); user-select:all; -webkit-user-select:all; } li .code { font-size:inherit; }

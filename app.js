@@ -67,11 +67,18 @@ const Store = (() => {
       events.push(ev); save(); emit(true); sync();
       return ev;
     },
-    async setRoom(code) { room = code; localStorage.setItem('dvoje.room', code); status = 'connecting'; await load(); emit(); await sync(); },
+    async setRoom(code) { room = code; localStorage.setItem('dvoje.room', code); localStorage.setItem('dvoje.lastRoom', code); status = 'connecting'; await load(); emit(); await sync(); },
+    unsynced: () => events.filter(e => !e.synced).length,
     async reset() {
-      if (room) await idb('readwrite', s => s.delete(room)).catch(() => {});
-      events = []; cursor = 0;
-      if (ONLINE) { room = null; localStorage.removeItem('dvoje.room'); }
+      if (ONLINE) {
+        // Signing out only forgets which space this device is in. Everything already lives
+        // online; the local copy is kept so coming back with the same code is instant.
+        await sync();
+        room = null; events = []; cursor = 0; localStorage.removeItem('dvoje.room');
+      } else {
+        await idb('readwrite', s => s.delete(room)).catch(() => {});
+        events = []; cursor = 0;
+      }
       emit();
     },
     async init() {
@@ -322,6 +329,29 @@ function stepBuild(step, target) {
 // ---------- Screens ----------
 function newCode() { const abc = 'abcdefghjkmnpqrstuvwxyz23456789'; return Array.from(crypto.getRandomValues(new Uint8Array(16)), b => abc[b % abc.length]).join(''); }
 const inviteLink = () => location.origin + location.pathname + '#join=' + Store.room();
+// Codes are stored as plain lowercase letters/digits and shown in groups of four.
+const normCode = s => { s = String(s || '').trim(); const m = s.match(/#join=([a-z0-9-]+)/i); return (m ? m[1] : s).toLowerCase().replace(/[^a-z0-9]/g, ''); };
+const showCode = c => ((c || '').match(/.{1,4}/g) || []).join('-');
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+const codeBox = () => h('div', { class: 'code-box' }, h('div', { class: 'muted small' }, 'Your space code'), h('b', { class: 'code' }, showCode(Store.room())));
+const shareBtn = (label = 'Share invite link') => h('button', { class: 'btn', onclick: async e => {
+  const url = inviteLink(), btn = e.currentTarget;
+  try { if (navigator.share) await navigator.share({ title: 'Dvoje · اتنين', text: 'Join our Dvoje space (code ' + showCode(Store.room()) + '):', url }); else { await navigator.clipboard.writeText(url); btn.textContent = 'Link copied ✓'; } }
+  catch (err) { if (err && err.name !== 'AbortError') prompt('Copy this link and send it:', url); }
+} }, label);
+function iosHint(where) {
+  if (!isIOS || standalone) return null;
+  if (where === 'home' && localStorage.getItem('dvoje.iosHint') === 'hide') return null;
+  return h('div', { class: 'card hint' },
+    h('h3', {}, '📲 Put Dvoje on your Home Screen'),
+    h('ol', {},
+      h('li', {}, 'Open this page in ', h('b', {}, 'Safari'), ' (in WhatsApp, tap ··· → Open in Safari).'),
+      h('li', {}, 'Tap the Share button ', h('b', {}, '⬆️'), ' at the bottom.'),
+      h('li', {}, 'Scroll and tap ', h('b', {}, 'Add to Home Screen'), ', then ', h('b', {}, 'Add'), '.'),
+      Store.room() ? h('li', {}, 'Open the new icon. It starts fresh, so tap ', h('b', {}, 'Join'), ' and enter the code ', h('b', { class: 'code' }, showCode(Store.room())), ', then ', h('b', {}, 'Continue as ' + (D.names[me] || 'you')), '.') : null),
+    where === 'home' ? h('button', { class: 'btn ghost small', onclick: () => { localStorage.setItem('dvoje.iosHint', 'hide'); render(); } }, 'Hide') : null);
+}
 function viewOnboard() {
   const role = ui.pendingRole;
   const top = [h('div', { class: 'logo' }, h('img', { src: 'icon.svg', alt: '' })),
@@ -329,12 +359,19 @@ function viewOnboard() {
     h('p', { class: 'muted' }, 'Two people, two languages, one place.')];
   if (ONLINE && !Store.room()) {
     let code = '';
-    const join = () => { const c = (code.split('#join=').pop() || '').trim(); if (c.length >= 12) Store.setRoom(c); else alert('That invite code looks too short.'); };
+    const last = localStorage.getItem('dvoje.lastRoom');
+    const join = () => { const c = normCode(code); if (c.length >= 12) Store.setRoom(c); else alert('That code looks too short. It has 16 letters and numbers, like abcd-efgh-jkmn-pqrs.'); };
+    const create = () => { if (confirm('Only ONE of you creates the space. If your partner already made one, press Cancel and join with their link or code instead.\n\nCreate a brand-new, empty space?')) Store.setRoom(newCode()); };
     return h('div', { class: 'onboard' }, top,
-      h('button', { class: 'btn primary', onclick: () => Store.setRoom(newCode()) }, 'Create our space'),
-      h('p', { class: 'muted small' }, 'Already invited? Open the invite link on this phone, or paste it here:'),
-      h('input', { class: 'text', placeholder: 'Invite link or code', oninput: e => { code = e.target.value; } }),
-      h('button', { class: 'btn', onclick: join }, 'Join'));
+      last ? h('button', { class: 'btn primary', onclick: () => Store.setRoom(last) }, 'Go back to our space', h('div', { class: 'small', style: 'font-weight:400' }, showCode(last))) : null,
+      h('p', { class: 'muted small' }, 'Joining your partner? Open their invite link on this phone, or type the code here:'),
+      h('input', { class: 'text', placeholder: 'Invite link or code', autocapitalize: 'off', autocomplete: 'off', oninput: e => { code = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') join(); } }),
+      h('button', { class: last ? 'btn' : 'btn primary', onclick: join }, 'Join'),
+      h('p', { class: 'muted small' }, 'First time for both of you?'),
+      h('button', { class: 'btn ghost', onclick: create }, 'Create a new space'));
+  }
+  if (ONLINE && Store.status() === 'connecting' && !Store.all().length) {
+    return h('div', { class: 'onboard' }, top, h('p', { class: 'muted' }, 'Opening your space…'));
   }
   if (!role) {
     const choose = r => { if (D.names[r]) { me = r; localStorage.setItem('dvoje.me', me); tab = 'home'; } else ui.pendingRole = r; render(); };
@@ -365,11 +402,16 @@ function viewHome() {
   const out = [
     h('div', { class: 'card duo' }, person(me), person(them),
       h('div', { class: 'together' }, D.together ? `💞 ${D.together}-day streak together` : '💞 Both finish a lesson on the same day to start a streak together')),
+    ONLINE && !D.names[them] ? h('div', { class: 'card hint' },
+      h('h3', {}, `Waiting for the ${LANG[them].name} speaker`),
+      h('p', { class: 'muted' }, 'Nobody else is in this space yet. Send this link to your partner. They should open it (or tap Join and type the code), not create a new space.'),
+      codeBox(), shareBtn()) : null,
     nextLesson ? h('div', { class: 'card hero' },
       h('div', { class: 'small' }, doneToday ? 'Today is done — want one more?' : "Today's lesson"),
       h('h2', {}, `${nextLesson.emoji} ${nextLesson.title}`),
       h('button', { class: 'btn light', onclick: () => startLesson(nextLesson) }, 'Start'))
       : h('div', { class: 'card hero' }, h('h2', {}, '🏁 You finished every lesson'), h('div', { class: 'small' }, 'Replay any lesson below to keep your streak.')),
+    iosHint('home'),
   ];
   let level = 0;
   LESSONS.forEach((l, i) => {
@@ -450,18 +492,17 @@ function viewMe() {
     ONLINE
       ? h('div', { class: 'card' }, h('h3', {}, D.names[them] ? `${nameOf(them)} is here 💞` : 'Invite your partner'),
           h('p', { class: 'muted' }, Store.status() === 'online' ? 'Synced ✓' : Store.status() === 'offline' ? 'Offline — changes are saved here and sync when you are back.' : 'Connecting…'),
-          h('p', { class: 'muted small' }, 'The invite link is the key to your space. Share it only with each other.'),
-          h('button', { class: 'btn', onclick: async e => {
-            const url = inviteLink();
-            try { if (navigator.share) await navigator.share({ title: 'Dvoje · اتنين', url }); else { await navigator.clipboard.writeText(url); e.target.textContent = 'Link copied ✓'; } } catch {}
-          } }, 'Share invite link'))
+          codeBox(),
+          h('p', { class: 'muted small' }, 'This code is the key to your space. Use it to come back on any phone or browser, and share it only with each other.'),
+          shareBtn())
       : h('div', { class: 'card' }, h('h3', {}, 'Trying it on one device'),
           h('p', { class: 'muted' }, 'Until the app is online, both of you can use this device. Switch sides to play as the other person.'),
           h('button', { class: 'btn', onclick: () => { if (D.names[them]) { me = them; localStorage.setItem('dvoje.me', me); tab = 'home'; } else ui.pendingRole = them; render(); } },
             D.names[them] ? `Switch to ${nameOf(them)}` : `Add the ${LANG[them].name} speaker`)),
+    iosHint('me'),
     h('div', { class: 'card' }, h('h3', {}, ONLINE ? 'This device' : 'Start over'),
       h('button', { class: 'btn danger', onclick: () => {
-        if (confirm(ONLINE ? 'Sign this device out of your space? Your shared progress stays online; you need the invite link to come back.' : 'Delete all progress, notes and recordings on this device? This cannot be undone.')) { localStorage.removeItem('dvoje.me'); me = null; tab = 'home'; Store.reset(); }
+        if (confirm(ONLINE ? `Sign this device out? Your progress stays safe online. To come back, tap "Go back to our space" or enter the code ${showCode(Store.room())}.` : 'Delete all progress, notes and recordings on this device? This cannot be undone.')) { localStorage.removeItem('dvoje.me'); me = null; tab = 'home'; Store.reset(); }
       } }, ONLINE ? 'Sign out on this device' : 'Erase everything on this device')),
   ];
 }
@@ -487,11 +528,11 @@ function render() {
 Store.onChange(mine => { if (S && !S.finished) return; const el = document.activeElement; if (!mine && el && /INPUT|TEXTAREA/.test(el.tagName) && el.value) return; render(); });
 (async () => {
   await Store.init();
-  const m = location.hash.match(/#join=([a-z0-9]{12,})/i);
-  if (m && ONLINE) {
+  const m = location.hash.match(/#join=([a-z0-9-]{12,})/i), code = m && normCode(m[1]);
+  if (code && ONLINE) {
     history.replaceState(null, '', location.pathname);
-    if (m[1] !== Store.room() && (!Store.room() || confirm('Open the space from this invite link? This device will leave the space it is in now.'))) {
-      localStorage.removeItem('dvoje.me'); me = null; await Store.setRoom(m[1]);
+    if (code !== Store.room() && (!Store.room() || confirm('Switch to the space from this invite link? This phone leaves the space it is in now (nothing is deleted).'))) {
+      localStorage.removeItem('dvoje.me'); me = null; await Store.setRoom(code);
     }
   }
   render();
