@@ -1,7 +1,7 @@
-// Paste your Supabase project's URL and its publishable (anon) key here.
-// Both are meant to be public; what keeps your space private is the invite code.
-// While these are empty the app runs on this device only.
+// Supabase project URL and publishable key. Both are meant to be public;
+// what keeps your space private is the invite code.
+// If these are empty the app runs on this device only.
 window.DVOJE_CONFIG = {
-  url: '',
-  key: '',
+  url: 'https://xkamoouefbgfshhnkzsc.supabase.co',
+  key: 'sb_publishable_S5QgSTojXYyR8ZapGrF8wA_uvLKyMGO',
 };
