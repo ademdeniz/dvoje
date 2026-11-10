@@ -34,7 +34,7 @@ const LESSONS = [
     { id: 'fiance', en: 'my fiancé(e)', bs: 'Moj zaručnik', ar: 'خطيبتي', tr: 'khatibti' },
     { id: 'forever', en: 'forever', bs: 'Zauvijek', ar: 'للأبد', tr: 'lel-abad' },
   ]},
-  { id: 'numbers', level: 2, emoji: '🔢', title: 'Numbers 1–8', items: [
+  { id: 'numbers', level: 2, emoji: '🔢', title: 'Numbers 1–10', items: [
     { id: 'n1', en: 'one', bs: 'Jedan', ar: 'واحد', tr: 'wahed' },
     { id: 'n2', en: 'two', bs: 'Dva', ar: 'اتنين', tr: 'etnein' },
     { id: 'n3', en: 'three', bs: 'Tri', ar: 'تلاتة', tr: 'talata' },
@@ -43,6 +43,8 @@ const LESSONS = [
     { id: 'n6', en: 'six', bs: 'Šest', ar: 'ستة', tr: 'setta' },
     { id: 'n7', en: 'seven', bs: 'Sedam', ar: 'سبعة', tr: 'sabʿa' },
     { id: 'n8', en: 'eight', bs: 'Osam', ar: 'تمانية', tr: 'tamanya' },
+    { id: 'n9', en: 'nine', bs: 'Devet', ar: 'تسعة', tr: 'tesʿa' },
+    { id: 'n10', en: 'ten', bs: 'Deset', ar: 'عشرة', tr: 'ʿashara' },
   ]},
   { id: 'family', level: 2, emoji: '👨‍👩‍👧', title: 'Family', items: [
     { id: 'mother', en: 'mother', bs: 'Majka', ar: 'أم', tr: 'omm' },
