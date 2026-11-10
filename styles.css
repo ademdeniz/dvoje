@@ -82,3 +82,8 @@ main > * { flex-shrink:0; } header, nav { flex-shrink:0; } main { min-height:0; 
 
 .rec-list { display:flex; flex-direction:column; gap:6px; } .rec-row { display:flex; align-items:center; gap:10px; width:100%; text-align:start; border:1px solid var(--line); border-radius:14px; padding:8px 12px; background:#F0FBF9; }
 .rec-row small { display:block; color:var(--muted); font-size:14px; margin-top:2px; } .rec-play { font-size:22px; } .tr-inline { color:var(--teal); }
+
+.gloss { display:block; color:var(--muted); font-size:14px; margin-top:4px; font-weight:400; }
+.reveal { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 14px; } .reveal .gloss { margin-top:2px; }
+.reveal-list { display:flex; flex-direction:column; gap:6px; }
+.sound-sm { font-size:16px; background:#F0FBF9; border-radius:50%; width:32px; height:32px; vertical-align:middle; }

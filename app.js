@@ -280,6 +280,10 @@ function viewSession() {
   return h('div', { class: 'session' }, bar, body);
 }
 const meaning = it => [W(it, me, 'mean'), h('div', { class: 'en' }, it.en)];
+// The small line shown once a question is answered: how it sounds (Arabic) · my word · English.
+const gloss = (it, target) => h('small', { class: 'gloss' }, target === 'ar' && translit(it) ? h('i', { class: 'tr-inline' }, translit(it) + ' · ') : null, W(it, me), ' · ' + it.en);
+const reveal = (it, target) => h('div', { class: 'reveal' }, W(it, target, 'big'), ' ', soundBtnSmall(it, target), gloss(it, target));
+const soundBtnSmall = (it, lang) => h('button', { class: 'sound-sm', 'aria-label': 'Listen', onclick: e => { e.stopPropagation(); speak(it, lang); } }, D.audio[it.id + ':' + lang] ? '🗣️' : '🔊');
 const cont = (label) => h('button', { class: 'btn primary bottom', onclick: next }, label || 'Continue');
 
 function stepIntro(step, target) {
@@ -304,7 +308,7 @@ function stepMcq(step, target) {
     h('div', { class: 'options' }, step.options.map(o => h('button', {
       class: 'opt' + (answered && o === it ? ' right' : '') + (answered && step.picked === o.id && o !== it ? ' wrong' : ''),
       onclick: () => pick(o),
-    }, toNative ? [W(o, me), h('small', {}, o.en)] : W(o, target, 'big')))),
+    }, toNative ? [W(o, me), h('small', {}, o.en)] : [W(o, target, 'big'), answered ? gloss(o, target) : null]))),
     answered ? h('div', { class: 'verdict ' + (step.picked === it.id ? 'ok' : 'bad') }, step.picked === it.id ? 'Correct! ✨' : 'Not quite — it comes back later.') : null,
     answered ? cont() : null);
 }
@@ -321,6 +325,7 @@ function stepMatch(step, target) {
     h('div', { class: 'match' },
       h('div', { class: 'col' }, step.left.map(it => h('button', { class: 'opt' + (step.matched.includes(it.id) ? ' gone' : '') + (step.sel === it.id ? ' sel' : ''), onclick: () => tapL(it) }, W(it, target, 'big')))),
       h('div', { class: 'col' }, step.right.map(it => h('button', { class: 'opt' + (step.matched.includes(it.id) ? ' gone' : '') + (step.wrong === it.id ? ' wrong' : ''), onclick: () => tapR(it) }, W(it, me))))),
+    done ? h('div', { class: 'reveal-list' }, step.left.map(it => reveal(it, target))) : null,
     done ? cont() : null);
 }
 function stepBuild(step, target) {
@@ -343,7 +348,8 @@ function stepBuild(step, target) {
       class: 'tile ' + target + (step.answer.includes(i) ? ' used' : ''), lang: target,
       onclick: () => { if (!checked && !step.answer.includes(i)) { step.answer.push(i); render(); } },
     }, tile.t))),
-    checked ? h('div', { class: 'verdict ' + (step.checked ? 'ok' : 'bad') }, step.checked ? 'Correct! ✨' : ['It is: ', W(it, target)]) : null,
+    checked ? h('div', { class: 'verdict ' + (step.checked ? 'ok' : 'bad') }, step.checked ? 'Correct! ✨' : 'Not quite. It is:') : null,
+    checked ? reveal(it, target) : null,
     checked ? cont() : h('button', { class: 'btn primary bottom', disabled: step.answer.length === 0, onclick: check }, 'Check'));
 }
 
